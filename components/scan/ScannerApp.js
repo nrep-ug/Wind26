@@ -6,6 +6,8 @@ import { api, formatDate, formatTime } from "@/components/api"
 import { Columns } from "@/components/admin/Charts"
 
 const SAME_CODE_COOLDOWN_MS = 4000
+// A whole badge code: an optional event-code prefix such as "CODE:", then the tag's UUID.
+const FULL_CODE = /(^|:|\/)[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 function beep(ok) {
   try {
@@ -36,6 +38,9 @@ export default function ScannerApp({ local = false }) {
   const lastCode = useRef({ code: "", at: 0 })
   const sending = useRef(false)
   const wedgeRef = useRef(null)
+  const wedgeTimer = useRef(null)
+  const [via, setVia] = useState("camera")
+  const [lastRead, setLastRead] = useState("")
 
   const loadSummary = useCallback(() => api("/api/scan/summary").then(setSummary).catch((e) => setResult({ tone: "bad", title: e.message })), [])
 
@@ -82,12 +87,30 @@ export default function ScannerApp({ local = false }) {
     }
   }, [loadSummary, summary])
 
-  const onCode = useCallback((code) => {
+  // The camera sees the same QR in many frames, so it waits before repeating a code.
+  // A handheld scanner reads once per trigger pull, so every read counts.
+  const onCode = useCallback((code, via = "camera") => {
     const now = Date.now()
-    if (code === lastCode.current.code && now - lastCode.current.at < SAME_CODE_COOLDOWN_MS) return
+    if (via === "camera" && code === lastCode.current.code && now - lastCode.current.at < SAME_CODE_COOLDOWN_MS) return
     lastCode.current = { code, at: now }
+    setVia(via)
     submit({ code })
   }, [submit])
+
+  // Some handheld scanners don't press Enter after the code. Send a complete code
+  // on its own once the typing stops.
+  const sendWedge = useCallback(() => {
+    clearTimeout(wedgeTimer.current)
+    const value = wedgeRef.current?.value.trim() || ""
+    if (!value) return
+    wedgeRef.current.value = ""
+    setLastRead(value)
+    onCode(value, "wedge")
+  }, [onCode])
+  const onWedgeInput = useCallback(() => {
+    clearTimeout(wedgeTimer.current)
+    if (FULL_CODE.test(wedgeRef.current?.value.trim() || "")) wedgeTimer.current = setTimeout(sendWedge, 150)
+  }, [sendWedge])
 
   // Camera loop: decode a frame roughly 8 times a second.
   useEffect(() => {
@@ -170,14 +193,7 @@ export default function ScannerApp({ local = false }) {
       {!online && <p className="notice bad">No connection. Scans can&apos;t be saved right now. Write names on the paper list; an admin will add them later.</p>}
       {w && !w.ok && <p className="notice warn">{w.message}</p>}
 
-      {result && (
-        <div className={`result ${result.tone}`} role="status" aria-live="assertive">
-          <p style={{ fontWeight: 700 }}>{result.title}</p>
-          {result.who && <p className="who">{result.who}</p>}
-          {result.org && <p className="muted">{result.org}</p>}
-          {result.note && <p className="small">{result.note}</p>}
-        </div>
-      )}
+      {result && via !== "wedge" && <ResultCard result={result} />}
 
       <div className="camera">
         <video ref={videoRef} playsInline muted hidden={!cameraOn} />
@@ -195,10 +211,13 @@ export default function ScannerApp({ local = false }) {
       </div>
       {cameraOn && <button className="secondary" onClick={() => setCameraOn(false)}>Stop camera</button>}
 
-      <form className="card stack" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); const v = wedgeRef.current.value; wedgeRef.current.value = ""; if (v.trim()) onCode(v.trim()) }}>
+      <form className="card stack" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); sendWedge() }}>
         <label htmlFor="wedge">Handheld scanner or pasted code
-          <input id="wedge" ref={wedgeRef} autoComplete="off" placeholder="Click here, then scan" />
+          <input id="wedge" ref={wedgeRef} autoComplete="off" placeholder="Click here, then scan" onInput={onWedgeInput} />
         </label>
+        {busy && via === "wedge" && <p className="small muted">Checking…</p>}
+        {lastRead && <p className="small muted" style={{ overflowWrap: "anywhere" }}>Last read: <span className="num">{lastRead}</span></p>}
+        {result && via === "wedge" && <ResultCard result={result} />}
       </form>
 
       <div className="card stack">
@@ -223,6 +242,7 @@ export default function ScannerApp({ local = false }) {
           <form className="stack" onSubmit={(e) => {
             e.preventDefault()
             const f = new FormData(e.currentTarget)
+            setVia("desk")
             submit({ attendeeId: chosen.id, reason: f.get("reason"), note: f.get("note") })
           }}>
             <p><strong>{chosen.fullName}</strong> <span className="muted">{chosen.organization}</span></p>
@@ -323,5 +343,16 @@ function DeskStats({ summary }) {
         </div>
       )}
     </section>
+  )
+}
+
+function ResultCard({ result }) {
+  return (
+    <div className={`result ${result.tone}`} role="status" aria-live="assertive">
+      <p style={{ fontWeight: 700 }}>{result.title}</p>
+      {result.who && <p className="who">{result.who}</p>}
+      {result.org && <p className="muted">{result.org}</p>}
+      {result.note && <p className="small">{result.note}</p>}
+    </div>
   )
 }
