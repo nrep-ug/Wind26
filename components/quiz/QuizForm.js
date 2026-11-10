@@ -72,7 +72,7 @@ export default function QuizForm({ tagId, quiz, initialResult, preview = false }
     setBusy(true)
     setError("")
     try {
-      setResult(await api(`/api/public/quizzes/${tagId}/${quiz.id}`, { method: "POST", body: { answers } }))
+      setResult(await api(`/api/public/quizzes/${tagId}/${quiz.id}`, { method: "POST", body: { answers, layout: quiz.layout } }))
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (err) {
       setError(err.message)

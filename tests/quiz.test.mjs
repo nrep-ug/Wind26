@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { createEventScope } from "../lib/server/db/stores.mjs"
 import { COLLECTIONS } from "../lib/server/db/schema.mjs"
 import { compare, createQuiz, listQuizzes, previewQuiz, quizResults, recordResponse, setQuizStatus, updateQuiz } from "../lib/server/services/quizzes.mjs"
-import { parseQuestions, publicQuestions, questionsToText, scoreAnswers, validateQuizInput } from "../lib/shared/quiz.mjs"
+import { parseQuestions, publicQuestions, questionsToText, quizLayout, scoreAnswers, validateQuizInput } from "../lib/shared/quiz.mjs"
 import { memoryStore } from "./memory-store.mjs"
 
 const noAudit = async () => {}
@@ -60,7 +60,7 @@ test("attendees answer an open quiz once, scored on the server", async () => {
   await assert.rejects(recordResponse(a, grace, quiz.id, [1, 0]), /already submitted/)
   const results = await quizResults(a, quiz.id)
   assert.equal(results.responses.length, 1)
-  assert.deepEqual(results.perQuestion, [{ correct: 1, answered: 1 }, { correct: 0, answered: 1 }])
+  assert.deepEqual(results.perQuestion, [{ correct: 1, answered: 1, chosen: [0, 1, 0] }, { correct: 0, answered: 1, chosen: [0, 1] }], "totals per question and per option, no names")
   await setQuizStatus(a, STARTED, quiz.id, "closed", noAudit)
   const peter = await a.create(COLLECTIONS.attendees, "peter", { fullName: "Peter Okello", tagId: "t2", role: "participant" })
   await assert.rejects(recordResponse(a, peter, quiz.id, [1, 0]), /closed/)
@@ -144,4 +144,27 @@ test("the before-and-after comparison only counts people who took both", () => {
   const r = (attendeeId, score) => ({ attendeeId, score, total: 10 })
   assert.deepEqual(compare([r("a", 4), r("b", 6)], [r("a", 8), r("c", 9)]), { both: 1, preAverage: 40, postAverage: 80, improved: 1 })
   assert.deepEqual(compare([], [r("a", 8)]), { both: 0, preAverage: null, postAverage: null, improved: 0 })
+})
+
+test("each attendee gets their own question order, and answers are marked against the saved quiz", () => {
+  const questions = Array.from({ length: 12 }, (_, i) => ({
+    text: `Question ${i + 1}`,
+    options: i === 3 ? ["One", "Two", "Three", "All the above"] : ["One", "Two", "Three", "Four"],
+    answer: i % 4,
+  }))
+  const a = quizLayout(questions, "quiz:grace")
+  const b = quizLayout(questions, "quiz:peter")
+  assert.deepEqual(quizLayout(questions, "quiz:grace").questions, a.questions, "the same person always sees the same order")
+  assert.notDeepEqual(a.questions.map((q) => q.text), b.questions.map((q) => q.text), "two people see different orders")
+  assert.deepEqual(a.questions.find((q) => q.text === "Question 4").options, questions[3].options, "'All the above' keeps its place")
+
+  // Picking the right answer on screen scores full marks once mapped back.
+  const shownRight = a.questions.map((q) => q.answer)
+  const saved = a.toSaved(shownRight)
+  assert.equal(scoreAnswers(questions, saved).score, 12)
+  assert.deepEqual(a.toShown(saved), shownRight, "saved answers map back to what was on screen")
+  // A wrong pick stays wrong.
+  const oneWrong = [...shownRight]; oneWrong[0] = (oneWrong[0] + 1) % 4
+  assert.equal(scoreAnswers(questions, a.toSaved(oneWrong)).score, 11)
+  assert.equal(scoreAnswers(questions, a.toSaved([0, 1])).ok, false, "a short answer list is still rejected")
 })

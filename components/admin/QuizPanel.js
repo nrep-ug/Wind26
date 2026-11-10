@@ -14,6 +14,7 @@ export default function QuizPanel({ event, quizzes, reload }) {
   const { busy, message, setMessage, run } = useAction(reload)
   const [editor, setEditor] = useState(null) // { id?, title, kind, passMark, text }
   const [results, setResults] = useState(null)
+  const [showNames, setShowNames] = useState(false)
   const [deleting, setDeleting] = useState(null)
   const firstDay = quizOpenFrom(event)
   const lastDay = quizOpenFrom(event, undefined, "post")
@@ -177,25 +178,10 @@ export default function QuizPanel({ event, quizzes, reload }) {
               <div className="stat"><b>{results.quiz.passed}</b><span>Passed ({results.quiz.passMark}%+)</span></div>
             </div>
             <div className="row spread">
-              <h3>People</h3>
-              <a className="button secondary" href={`${base}/${results.quiz.id}/csv`}><Icon name="download" />CSV</a>
+              <h3>Questions</h3>
+              <span className="muted small">Totals only. No names are shown here.</span>
             </div>
-            <div className="table-wrap" style={{ maxHeight: 300, overflowY: "auto" }}>
-              <table>
-                <tbody>
-                  {results.responses.map((r) => (
-                    <tr key={r.attendeeId}>
-                      <td className="person"><b>{r.fullName}</b><span>{r.organization}</span></td>
-                      <td className="num">{r.score}/{r.total}</td>
-                      <td><span className={`pill ${r.passed ? "ok" : "warn"}`}>{r.percent}%</span></td>
-                      <td className="small muted num">{formatDate(r.submittedAt).replace(/ \d{4}$/, "")} {formatTime(r.submittedAt, event.timezone)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <h3>Questions</h3>
-            <div className="table-wrap" style={{ maxHeight: 300, overflowY: "auto" }}>
+            <div className="table-wrap" style={{ maxHeight: 420, overflowY: "auto" }}>
               <table>
                 <tbody>
                   {results.quiz.questions.map((q, i) => {
@@ -203,15 +189,46 @@ export default function QuizPanel({ event, quizzes, reload }) {
                     const pct = s.answered ? Math.round((s.correct / s.answered) * 100) : 0
                     return (
                       <tr key={i}>
-                        <td className="small"><strong>{i + 1}.</strong> {q.text}<div className="muted">Answer {optionLetter(q.answer)}: {q.options[q.answer]}</div></td>
+                        <td className="small">
+                          <strong>{i + 1}.</strong> {q.text}
+                          <div className="muted">Answer {optionLetter(q.answer)}: {q.options[q.answer]}</div>
+                          {s.answered > 0 && s.chosen && (
+                            <div className="muted num">
+                              {q.options.map((_, j) => `${optionLetter(j)}: ${s.chosen[j]}`).join(" · ")}
+                            </div>
+                          )}
+                        </td>
                         <td style={{ width: 140 }}><div className="bar"><i style={{ width: `${pct}%` }} /></div></td>
-                        <td className="num small" style={{ width: 60 }}>{pct}%</td>
+                        <td className="num small" style={{ width: 110, whiteSpace: "nowrap" }}><b>{s.correct}</b> of {s.answered} right<br />{pct}%</td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
+            <div className="row spread">
+              <h3>People</h3>
+              <div className="row">
+                <button type="button" className="secondary" onClick={() => setShowNames((v) => !v)}>{showNames ? "Hide names" : "Show names"}</button>
+                <a className="button secondary" href={`${base}/${results.quiz.id}/csv`}><Icon name="download" />CSV</a>
+              </div>
+            </div>
+            {showNames && (
+              <div className="table-wrap" style={{ maxHeight: 300, overflowY: "auto" }}>
+                <table>
+                  <tbody>
+                    {results.responses.map((r) => (
+                      <tr key={r.attendeeId}>
+                        <td className="person"><b>{r.fullName}</b><span>{r.organization}</span></td>
+                        <td className="num">{r.score}/{r.total}</td>
+                        <td><span className={`pill ${r.passed ? "ok" : "warn"}`}>{r.percent}%</span></td>
+                        <td className="small muted num">{formatDate(r.submittedAt).replace(/ \d{4}$/, "")} {formatTime(r.submittedAt, event.timezone)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </Dialog>
