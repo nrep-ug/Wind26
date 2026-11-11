@@ -47,6 +47,7 @@ export default function QuizForm({ tagId, quiz, initialResult, preview = false }
                   </div>
                 )
               })}
+              {q.explanation && <p className="small muted" style={{ margin: "8px 0 0" }}><strong>Key point:</strong> {q.explanation}</p>}
             </div>
           )
         })}

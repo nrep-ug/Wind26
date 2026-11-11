@@ -140,7 +140,7 @@ export default function QuizPanel({ event, quizzes, reload }) {
               <textarea id="q-text" value={editor.text} style={{ minHeight: 240 }} placeholder={SAMPLE}
                 onChange={(e) => setEditor({ ...editor, text: e.target.value })} />
               <span className="muted small" style={{ fontWeight: 400 }}>
-                Number each question and letter each option. Mark the answer with &ldquo;Answer: B&rdquo;, a * after the option, or an answer key at the end.
+                Number each question and letter each option. Mark the answer with &ldquo;Answer: B&rdquo;, a * after the option, or an answer key at the end. An optional &ldquo;Why:&rdquo; line, or text after the letter in the answer key, is shown to each person after they submit.
               </span>
             </label>
             {editor.text.trim() && (
@@ -156,6 +156,7 @@ export default function QuizPanel({ event, quizzes, reload }) {
                     <div key={i} className="q-preview small">
                       <strong>{i + 1}. {q.text}</strong>
                       <ol type="A">{q.options.map((o, j) => <li key={j} className={j === q.answer ? "correct" : ""}>{o}</li>)}</ol>
+                      {q.explanation && <div className="muted">Why: {q.explanation}</div>}
                     </div>
                   ))}
                 </div>
@@ -192,6 +193,7 @@ export default function QuizPanel({ event, quizzes, reload }) {
                         <td className="small">
                           <strong>{i + 1}.</strong> {q.text}
                           <div className="muted">Answer {optionLetter(q.answer)}: {q.options[q.answer]}</div>
+                          {q.explanation && <div className="muted">Key point: {q.explanation}</div>}
                           {s.answered > 0 && s.chosen && (
                             <div className="muted num">
                               {q.options.map((_, j) => `${optionLetter(j)}: ${s.chosen[j]}`).join(" · ")}

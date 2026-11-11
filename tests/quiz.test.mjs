@@ -23,6 +23,32 @@ test("questions are read from pasted text with answer lines, stars or an answer 
   assert.deepEqual(parseQuestions(questionsToText(QUESTIONS)), QUESTIONS)
 })
 
+test("an answer key copied from a PDF carries explanations, kept out of the public quiz", () => {
+  const text = [
+    "1. Which part makes",
+    "electricity?",
+    "A. The blade, which turns in",
+    "the wind.",
+    "B. The generator.",
+    "2. What drives a turbine?",
+    "A. Sunlight.",
+    "B. Moving air.",
+    "Answer Key and Assessment Guide",
+    "Question Correct answer Key learning point",
+    "1 B The generator turns rotation into",
+    "electricity.",
+    "2",
+    "B",
+    "Wind is moving air.",
+  ].join("\n")
+  const qs = parseQuestions(text)
+  assert.equal(qs[0].text, "Which part makes electricity?")
+  assert.equal(qs[0].options[0], "The blade, which turns in the wind.")
+  assert.deepEqual(qs.map((q) => [q.answer, q.explanation]), [[1, "The generator turns rotation into electricity."], [1, "Wind is moving air."]])
+  assert.equal(parseQuestions(questionsToText(qs))[1].explanation, "Wind is moving air.")
+  assert.ok(!("explanation" in publicQuestions(qs)[0]))
+})
+
 test("a quiz needs a title, options and a marked answer for every question", () => {
   assert.equal(validateQuizInput({ title: "Post-test", passMark: 50, questions: QUESTIONS }).ok, true)
   const missing = validateQuizInput({ title: "Post-test", passMark: 50, questions: [{ text: "Q", options: ["A", "B"], answer: -1 }] })
