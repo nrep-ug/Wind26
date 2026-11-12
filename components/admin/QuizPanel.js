@@ -108,6 +108,7 @@ export default function QuizPanel({ event, quizzes, reload }) {
               <div className="row">
                 <a className="button secondary" href={`/admin/quiz-preview/${event.id}/${q.id}`} target="_blank" rel="noreferrer">Preview</a>
                 {q.responses > 0 && <button className="secondary" disabled={busy} onClick={() => showResults(q)}>Results</button>}
+                {q.status !== "draft" && <a className="button secondary" href={`/admin/quiz-results/${event.id}/${q.id}`} target="_blank" rel="noreferrer">Results screen</a>}
                 {q.status === "draft" && <button className="secondary" disabled={busy} onClick={() => edit(q)}><Icon name="edit" />Edit</button>}
                 {q.kind === "pre" && !hasPost && <button className="secondary" disabled={busy} onClick={() => copyAsPost(q)}>Copy as post-training</button>}
                 {q.status === "draft" && !q.responses && <button className="ghost" disabled={busy} onClick={() => setDeleting(q)}>Delete</button>}

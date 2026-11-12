@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { api, formatDate, formatTime } from "@/components/api"
-import { MANUAL_REASONS, ROLES } from "@/lib/shared/validation.mjs"
+import { GENDERS, MANUAL_REASONS, ROLES } from "@/lib/shared/validation.mjs"
 import Dialog, { Toast, plural, useAction } from "./Dialog"
 import Icon from "./Icon"
 import { badgePdfUrl, emailBadges } from "./actions"
 
-const EMPTY = { fullName: "", organization: "", email: "", phone: "", role: "participant" }
+const EMPTY = { fullName: "", organization: "", email: "", phone: "", role: "participant", gender: "" }
 const FIELDS = [
   ["fullName", "Full name", "text", "full"],
   ["organization", "Organisation", "text", "full"],
@@ -29,7 +29,7 @@ export default function AttendeesPanel({ event, attendees, reload }) {
   const setActing = (a) => setActingId(a ? a.id : null)
   // Closes the action panel, then runs the chosen action (which may open its own dialog).
   const then = (fn) => () => { setActing(null); fn() }
-  const editDetails = (a) => setEditing({ id: a.id, values: { fullName: a.fullName, organization: a.organization, email: a.email, phone: a.phone, role: a.role }, errors: {} })
+  const editDetails = (a) => setEditing({ id: a.id, values: { fullName: a.fullName, organization: a.organization, email: a.email, phone: a.phone, role: a.role, gender: a.gender || "" }, errors: {} })
 
   const filtered = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean)
@@ -246,6 +246,14 @@ export default function AttendeesPanel({ event, attendees, reload }) {
                   {ROLES.map((r) => <option key={r} value={r}>{r[0].toUpperCase() + r.slice(1)}</option>)}
                 </select>
               </label>
+              <label htmlFor="f-gender">
+                Gender
+                <select id="f-gender" value={editing.values.gender} onChange={(e) => setEditing({ ...editing, values: { ...editing.values, gender: e.target.value } })}>
+                  <option value="">Not recorded</option>
+                  {Object.entries(GENDERS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </select>
+                {editing.errors?.gender && <span className="field-error">{editing.errors.gender}</span>}
+              </label>
             </div>
             <div className="dialog-foot">
               <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancel</button>
@@ -258,7 +266,7 @@ export default function AttendeesPanel({ event, attendees, reload }) {
       <Dialog message={message} open={Boolean(importing)} title="Import attendees" wide onClose={() => setImporting(null)}>
         {importing && (
           <div className="stack">
-            <p className="muted small">CSV with a header row: <strong>Name</strong>, Organisation, Email, Phone, Role.</p>
+            <p className="muted small">CSV with a header row: <strong>Name</strong>, Organisation, Email, Phone, Role, Gender.</p>
             <label htmlFor="csv-file">File<input id="csv-file" type="file" accept=".csv,text/csv" onChange={(e) => readFile(e.target.files?.[0])} /></label>
             <label htmlFor="csv-text">Or paste
               <textarea id="csv-text" value={importing.csv} onChange={(e) => setImporting({ csv: e.target.value, preview: null, error: "" })} placeholder={"Name,Organisation,Email\nGrace Achieng,Example Energy Ltd,grace@example.org"} />

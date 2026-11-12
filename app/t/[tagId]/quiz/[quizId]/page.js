@@ -19,6 +19,7 @@ export default async function QuizPage({ params }) {
         <p className="muted small">{attendee.fullName}</p>
       </header>
       <QuizForm tagId={attendee.tagId} quiz={quiz} initialResult={result} />
+      <Link className="muted small" href={`/t/${attendee.tagId}/quiz`}>All my quizzes</Link>
       <Link className="muted small" href={`/t/${attendee.tagId}`}>Back to my badge</Link>
     </main>
   )

@@ -5,6 +5,7 @@ import { api } from "@/components/api"
 import { localParts } from "@/lib/shared/event-days.mjs"
 import { QUIZ_KINDS } from "@/lib/shared/quiz.mjs"
 import { groupOrganisations } from "@/lib/shared/org.mjs"
+import { GENDERS } from "@/lib/shared/validation.mjs"
 import Icon from "./Icon"
 import { Columns, useTip } from "./Charts"
 import { plural } from "./Dialog"
@@ -19,6 +20,7 @@ const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0)
 
 export default function AnalyticsPanel({ event, attendees, quizzes }) {
   const [org, setOrg] = useState("")
+  const [gender, setGender] = useState("") // "", "female", "male" or "none"
   const [segment, setSegment] = useState(null) // { id, label, test(attendee) }
   const [day, setDay] = useState(null)
   const [allOrgs, setAllOrgs] = useState(false)
@@ -48,9 +50,13 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
       .sort((x, y) => y.people.length - x.people.length || x.label.localeCompare(y.label))
   }, [attendees, orgOf])
 
-  const scoped = org ? attendees.filter((a) => orgOf.get(a.organization.trim()).key === org) : attendees
+  const inOrg = org ? attendees.filter((a) => orgOf.get(a.organization.trim()).key === org) : attendees
+  const genderOf = (a) => a.gender || "none"
+  const scoped = gender ? inOrg.filter((a) => genderOf(a) === gender) : inOrg
   const people = segment ? scoped.filter(segment.test) : scoped
   const orgLabel = groups.find((g) => g.key === org)?.label
+  const GENDER_GROUPS = { ...GENDERS, none: "Not recorded" }
+  const genderLabel = gender ? GENDER_GROUPS[gender] : ""
 
   const pick = (next) => setSegment((cur) => (cur?.id === next.id ? null : next))
   const withEmail = scoped.filter((a) => a.email)
@@ -80,8 +86,8 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
 
   function downloadCsv() {
     const esc = (v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
-    const head = ["Name", "Organisation", "Email", "Phone", "Days attended", "Badge emailed", ...answeredQuizzes.map((q) => `${q.title} (%)`)]
-    const rows = people.map((a) => [a.fullName, a.organization, a.email, a.phone, a.days.join(" "), a.tagEmailedAt ? "Yes" : a.email ? "No" : "No email",
+    const head = ["Name", "Organisation", "Gender", "Email", "Phone", "Days attended", "Badge emailed", ...answeredQuizzes.map((q) => `${q.title} (%)`)]
+    const rows = people.map((a) => [a.fullName, a.organization, GENDERS[a.gender] || "", a.email, a.phone, a.days.join(" "), a.tagEmailedAt ? "Yes" : a.email ? "No" : "No email",
       ...answeredQuizzes.map((q) => results[q.id].get(a.id) ?? "")])
     const blob = new Blob([[head, ...rows].map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv" })
     const link = document.createElement("a")
@@ -98,12 +104,23 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
           <h1>Analytics</h1>
           <p>Click any bar or number to see who is behind it.</p>
         </div>
+        <div className="row">
+        <label className="an-filter" htmlFor="an-gender">Gender
+          <select id="an-gender" value={gender} onChange={(e) => { setGender(e.target.value); setSegment(null) }}>
+            <option value="">Everyone ({inOrg.length})</option>
+            {Object.entries(GENDER_GROUPS).map(([v, label]) => {
+              const n = inOrg.filter((a) => genderOf(a) === v).length
+              return (n || v !== "none") && <option key={v} value={v}>{label} ({n})</option>
+            })}
+          </select>
+        </label>
         <label className="an-filter" htmlFor="an-org">Organisation
           <select id="an-org" value={org} onChange={(e) => { setOrg(e.target.value); setSegment(null) }}>
             <option value="">All organisations ({attendees.length})</option>
             {groups.map((g) => <option key={g.key} value={g.key}>{g.label} ({g.people.length})</option>)}
           </select>
         </label>
+        </div>
       </div>
 
       <div className="stats">
@@ -161,6 +178,9 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
         </section>
       </div>
 
+      <GenderCard event={event} people={inOrg} genderOf={genderOf} labels={GENDER_GROUPS} quizzes={answeredQuizzes} results={results}
+        selected={gender} onPick={(g) => { setGender(gender === g ? "" : g); setSegment(null) }} />
+
       <section className="card stack">
         <div className="card-head">
           <h2>Organisations</h2>
@@ -213,6 +233,7 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
           <div className="row">
             <h2>{plural(people.length, "person", "people")}</h2>
             {orgLabel && <button type="button" className="an-chip on" onClick={() => setOrg("")}>{orgLabel}<Icon name="x" size={14} /></button>}
+            {genderLabel && <button type="button" className="an-chip on" onClick={() => setGender("")}>{genderLabel}<Icon name="x" size={14} /></button>}
             {segment && <button type="button" className="an-chip on" onClick={() => setSegment(null)}>{segment.label}<Icon name="x" size={14} /></button>}
           </div>
           <button type="button" className="secondary" onClick={downloadCsv} disabled={!people.length}><Icon name="download" />CSV of this list</button>
@@ -246,6 +267,59 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
         </div>
       </section>
     </>
+  )
+}
+
+// Women and men side by side: how many registered, came each day, and their quiz averages.
+// Follows the organisation filter, and clicking a row filters the whole page to that group.
+function GenderCard({ event, people, genderOf, labels, quizzes, results, selected, onPick }) {
+  const rows = Object.entries(labels)
+    .map(([key, label]) => ({ key, label, group: people.filter((a) => genderOf(a) === key) }))
+    .filter((r) => r.group.length || r.key !== "none")
+  if (!rows.some((r) => r.key !== "none" && r.group.length)) {
+    return (
+      <section className="card stack">
+        <h2>Women and men</h2>
+        <p className="muted small">No gender recorded yet. Set it when editing an attendee, or import a CSV with a Gender column.</p>
+      </section>
+    )
+  }
+  const average = (q, group) => {
+    const scores = group.map((a) => results[q.id].get(a.id)).filter((v) => v !== undefined)
+    return scores.length ? { avg: Math.round(scores.reduce((t, v) => t + v, 0) / scores.length), n: scores.length } : null
+  }
+  return (
+    <section className="card stack">
+      <div className="card-head"><h2>Women and men</h2><span className="small muted">Click a row to filter the page</span></div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th></th>
+              <th className="num">Registered</th>
+              {event.days.map((d) => <th key={d.day} className="num">Day {d.day}</th>)}
+              {quizzes.map((q) => <th key={q.id} className="num">{q.title}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ key, label, group }) => (
+              <tr key={key} className={selected === key ? "on" : ""} style={{ cursor: "pointer" }} onClick={() => onPick(key)}>
+                <td><b>{label}</b></td>
+                <td className="num">{group.length}</td>
+                {event.days.map((d) => {
+                  const came = group.filter((a) => a.days.includes(d.day)).length
+                  return <td key={d.day} className="num">{came} <span className="muted small">({pct(came, group.length)}%)</span></td>
+                })}
+                {quizzes.map((q) => {
+                  const r = average(q, group)
+                  return <td key={q.id} className="num">{r ? <>{r.avg}% <span className="muted small">avg, {r.n} took it</span></> : <span className="muted">—</span>}</td>
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
   )
 }
 

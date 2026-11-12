@@ -16,6 +16,11 @@ test("import maps common headers and validates rows", () => {
   assert.equal(result.rows[1].line, 3)
 })
 
+test("import reads an optional Gender column", () => {
+  const result = prepareImport("Name,Sex\nGrace Achieng,F\nPeter Okello,Male\nJo Nambi,\n", [])
+  assert.deepEqual(result.rows.map((r) => r.value.gender), ["female", "male", ""])
+})
+
 test("import rejects duplicates in the file and against existing attendees", () => {
   const existing = [{ fullName: "Peter Okello", organization: "", email: "peter@example.org" }]
   const csv = "Name,Email\nPeter O,peter@example.org\nAnn,ann@example.org\nAnn K,ANN@example.org\n"

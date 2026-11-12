@@ -71,6 +71,9 @@ export default function CertificatesPanel({ event, attendees, reload }) {
           <button className="accent big" disabled={busy || !canIssue || (!toIssue.length && !toEmail.length)} onClick={() => setConfirmAll(true)}>
             <Icon name="send" />Send certificates to all{pending.length ? ` (${pending.length})` : ""}
           </button>
+          {issued.length > 0 && (
+            <a className="button secondary big" href={`${base}/certificates/pdf`}><Icon name="download" />All {issued.length} in one PDF</a>
+          )}
           {!toIssue.length && !toEmail.length && issued.length > 0 && <span className="pill ok">Everyone eligible has been sent theirs</span>}
         </div>
       </section>
