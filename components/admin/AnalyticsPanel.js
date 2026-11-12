@@ -83,12 +83,28 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
     return { q, color: SERIES[i], counts: SCORE_BUCKETS.map((b) => scores.filter((s) => s >= b.lo && s <= b.hi).length), n: scores.length, avg: scores.length ? Math.round(scores.reduce((s, x) => s + x, 0) / scores.length) : null }
   })
   const scoreMax = Math.max(1, ...scoreSeries.flatMap((s) => s.counts))
+  // The average mark of every answered quiz, for whoever the filters leave in.
+  const quizName = (q) => (q.kind === "other" ? q.title : QUIZ_KINDS[q.kind])
+  const averages = answeredQuizzes.map((q) => {
+    const scores = scoped.map((a) => results[q.id].get(a.id)).filter((s) => s !== undefined)
+    const avg = scores.length ? Math.round(scores.reduce((t, x) => t + x, 0) / scores.length) : null
+    return { q, n: scores.length, avg, passed: scores.filter((s) => s >= q.passMark).length }
+  })
+  // One person's average over the quizzes they took; null when they took none.
+  const personAvg = (a) => {
+    const s = answeredQuizzes.filter((q) => results[q.id].has(a.id)).map((q) => results[q.id].get(a.id))
+    return s.length ? Math.round(s.reduce((t, x) => t + x, 0) / s.length) : null
+  }
+  const avgOf = (q, list) => {
+    const scores = list.map((a) => results[q.id].get(a.id)).filter((s) => s !== undefined)
+    return scores.length ? `${Math.round(scores.reduce((t, x) => t + x, 0) / scores.length)}%` : "—"
+  }
 
   function downloadCsv() {
     const esc = (v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
-    const head = ["Name", "Organisation", "Gender", "Email", "Phone", "Days attended", "Badge emailed", ...answeredQuizzes.map((q) => `${q.title} (%)`)]
+    const head = ["Name", "Organisation", "Gender", "Email", "Phone", "Days attended", "Badge emailed", ...answeredQuizzes.map((q) => `${q.title} (%)`), "Average (%)"]
     const rows = people.map((a) => [a.fullName, a.organization, GENDERS[a.gender] || "", a.email, a.phone, a.days.join(" "), a.tagEmailedAt ? "Yes" : a.email ? "No" : "No email",
-      ...answeredQuizzes.map((q) => results[q.id].get(a.id) ?? "")])
+      ...answeredQuizzes.map((q) => results[q.id].get(a.id) ?? ""), personAvg(a) ?? ""])
     const blob = new Blob([[head, ...rows].map((r) => r.map(esc).join(",")).join("\n")], { type: "text/csv" })
     const link = document.createElement("a")
     link.href = URL.createObjectURL(blob)
@@ -214,9 +230,18 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
             <h2>Quiz scores</h2>
             <span className="row small muted">
               {scoreSeries.map((s) => (
-                <span key={s.q.id} className="an-key"><i style={{ background: s.color }} />{QUIZ_KINDS[s.q.kind] || s.q.title}: {s.n} answered · average {s.avg ?? "—"}%</span>
+                <span key={s.q.id} className="an-key"><i style={{ background: s.color }} />{quizName(s.q)}: {s.n} answered · average {s.avg ?? "—"}%</span>
               ))}
             </span>
+          </div>
+          <div className="stats">
+            {averages.map((a) => (
+              <div key={a.q.id} className="stat">
+                <b>{a.avg ?? "—"}{a.avg !== null && "%"}</b>
+                <span>Average · {quizName(a.q)}</span>
+                <span className="muted small">{plural(a.n, "person", "people")} · {a.passed} passed ({a.q.passMark}%+)</span>
+              </div>
+            ))}
           </div>
           <ScoreChart series={scoreSeries} max={scoreMax} segment={segment}
             onPick={(s, b) => pick({ id: `score${s.q.id}-${b.lo}`, label: `${s.q.title}: scored ${b.lo}–${b.hi}%`, test: (a) => { const v = results[s.q.id].get(a.id); return v >= b.lo && v <= b.hi } })} />
@@ -245,7 +270,8 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
                 <th>Name</th>
                 <th>Days</th>
                 <th>Badge</th>
-                {answeredQuizzes.map((q) => <th key={q.id} className="num">{QUIZ_KINDS[q.kind] || q.title}</th>)}
+                {answeredQuizzes.map((q) => <th key={q.id} className="num">{quizName(q)}</th>)}
+                {answeredQuizzes.length > 0 && <th className="num" title="Average of the quizzes this person took">Average</th>}
               </tr>
             </thead>
             <tbody>
@@ -259,10 +285,20 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
                   </td>
                   <td>{a.tagEmailedAt ? <span className="pill ok">Emailed</span> : a.email ? <span className="pill warn">Not sent</span> : <span className="pill neutral">No email</span>}</td>
                   {answeredQuizzes.map((q) => <td key={q.id} className="num">{results[q.id].has(a.id) ? `${results[q.id].get(a.id)}%` : <span className="muted">—</span>}</td>)}
+                  {answeredQuizzes.length > 0 && <td className="num">{personAvg(a) === null ? <span className="muted">—</span> : <b>{personAvg(a)}%</b>}</td>}
                 </tr>
               ))}
-              {!people.length && <tr><td colSpan={3 + answeredQuizzes.length} className="muted">Nobody matches.</td></tr>}
+              {!people.length && <tr><td colSpan={4 + answeredQuizzes.length} className="muted">Nobody matches.</td></tr>}
             </tbody>
+            {people.length > 0 && answeredQuizzes.length > 0 && (
+              <tfoot>
+                <tr>
+                  <td colSpan={3}><b>Average</b> <span className="muted small">of the people listed who took each quiz</span></td>
+                  {answeredQuizzes.map((q) => <td key={q.id} className="num"><b>{avgOf(q, people)}</b></td>)}
+                  <td className="num"><b>{(() => { const v = people.map(personAvg).filter((x) => x !== null); return v.length ? `${Math.round(v.reduce((t, x) => t + x, 0) / v.length)}%` : "—" })()}</b></td>
+                </tr>
+              </tfoot>
+            )}
           </table>
         </div>
       </section>
