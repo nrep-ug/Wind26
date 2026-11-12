@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { api } from "@/components/api"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { api, formatTime } from "@/components/api"
 import { localParts } from "@/lib/shared/event-days.mjs"
 import { QUIZ_KINDS } from "@/lib/shared/quiz.mjs"
 import { groupOrganisations } from "@/lib/shared/org.mjs"
@@ -25,6 +25,9 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
   const [day, setDay] = useState(null)
   const [allOrgs, setAllOrgs] = useState(false)
   const [results, setResults] = useState({}) // quizId -> Map(attendeeId -> percent)
+  const [view, setView] = useState({ day: null, came: true, count: null }) // the "Who came" list
+  const whoRef = useRef(null)
+  const showWho = (next) => { setView(next); whoRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }) }
 
   // Scores per person, for the distribution chart and the people table.
   useEffect(() => {
@@ -158,14 +161,14 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
             items={dayStats.map((d) => ({
               key: d.day, value: d.came, label: `Day ${d.day}`, sub: shortDay(d.date), text: `${d.came}`,
               tip: [`Day ${d.day} · ${shortDay(d.date)}`, `${d.came} of ${scoped.length} checked in (${pct(d.came, scoped.length)}%)`, "Click to see who came"],
-              active: segment?.id === `day${d.day}`,
-              onClick: () => { setDay(d.day); pick({ id: `day${d.day}`, label: `Came on day ${d.day}`, test: (a) => a.days.includes(d.day) }) },
+              active: view.day === d.day && view.came,
+              onClick: () => { setDay(d.day); showWho({ day: d.day, came: true, count: null }) },
             }))}
             max={Math.max(1, scoped.length)} color="var(--brand)" />
           <div className="row small">
             {dayStats.map((d) => (
-              <button key={d.day} type="button" className={`an-chip ${segment?.id === `miss${d.day}` ? "on" : ""}`}
-                onClick={() => pick({ id: `miss${d.day}`, label: `Missed day ${d.day}`, test: (a) => !a.days.includes(d.day) })}>
+              <button key={d.day} type="button" className={`an-chip ${view.day === d.day && !view.came ? "on" : ""}`}
+                onClick={() => showWho({ day: d.day, came: false, count: null })}>
                 {scoped.length - d.came} missed day {d.day}
               </button>
             ))}
@@ -193,6 +196,8 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
           ) : <p className="muted small an-empty">No check-ins on day {shownDay} yet.</p>}
         </section>
       </div>
+
+      <WhoCame refEl={whoRef} event={event} people={scoped} view={view} setView={setView} />
 
       <GenderCard event={event} people={inOrg} genderOf={genderOf} labels={GENDER_GROUPS} quizzes={answeredQuizzes} results={results}
         selected={gender} onPick={(g) => { setGender(gender === g ? "" : g); setSegment(null) }} />
@@ -303,6 +308,88 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
         </div>
       </section>
     </>
+  )
+}
+
+// Who came: pick a day (came or didn't), or how many days people attended, and see them as cards.
+// Follows the gender and organisation filters. Tapping a bar in "Attendance by day" opens a day here.
+function WhoCame({ refEl, event, people, view, setView }) {
+  const total = event.days.length
+  const countOf = (n) => people.filter((a) => a.days.length === n).length
+  const COUNTS = [
+    { n: total, label: total > 1 ? `All ${total} days` : "Came" },
+    ...Array.from({ length: total - 1 }, (_, i) => total - 1 - i).map((n) => ({ n, label: n === 1 ? "Only 1 day" : `${n} days` })),
+    { n: 0, label: "No days" },
+  ]
+  // Until a day is picked, show the latest day anyone came.
+  const latest = [...event.days].reverse().find((d) => people.some((a) => a.days.includes(d.day)))?.day ?? event.days[0]?.day
+  const day = view.count === null ? (view.day ?? latest) : null
+  const list = (view.count !== null
+    ? people.filter((a) => a.days.length === view.count)
+    : people.filter((a) => a.days.includes(day) === view.came))
+    .slice().sort((x, y) => x.fullName.localeCompare(y.fullName))
+  const arrival = (a) => a.checkins.find((c) => c.day === day && c.at)?.at
+  const title = view.count !== null
+    ? (COUNTS.find((c) => c.n === view.count)?.label || "")
+    : `${view.came ? "Came on" : "Didn't come on"} day ${day}`
+
+  return (
+    <section className="card stack" ref={refEl} style={{ scrollMarginTop: 80 }}>
+      <div className="card-head">
+        <h2>Who came</h2>
+        <span className="small muted">of {plural(people.length, "registered person", "registered people")}</span>
+      </div>
+
+      <div className="stack" style={{ gap: 8 }}>
+        <div className="row small">
+          <span className="muted who-label">By day</span>
+          {event.days.map((d) => {
+            const n = people.filter((a) => a.days.includes(d.day)).length
+            return (
+              <button key={d.day} type="button" className={`an-chip ${view.count === null && day === d.day ? "on" : ""}`}
+                onClick={() => setView({ day: d.day, came: view.count === null ? view.came : true, count: null })}>
+                Day {d.day} · {view.count === null && !view.came ? `${people.length - n} missed` : `${n} came`}
+              </button>
+            )
+          })}
+          {view.count === null && (
+            <span className="an-tabs" role="tablist" aria-label="Came or not">
+              <button type="button" role="tab" aria-selected={view.came} onClick={() => setView({ ...view, came: true })}>Came</button>
+              <button type="button" role="tab" aria-selected={!view.came} onClick={() => setView({ ...view, came: false })}>Didn&apos;t come</button>
+            </span>
+          )}
+        </div>
+        <div className="row small">
+          <span className="muted who-label">Days attended</span>
+          {COUNTS.map((c) => (
+            <button key={c.n} type="button" className={`an-chip ${view.count === c.n ? "on" : ""}`}
+              onClick={() => setView({ day: view.day, came: true, count: c.n })}>
+              {c.label} · {countOf(c.n)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <p className="small"><b>{title}</b> · {plural(list.length, "person", "people")}</p>
+      {list.length ? (
+        <div className="who-grid">
+          {list.map((a) => {
+            const at = view.count === null && view.came ? arrival(a) : null
+            return (
+              <div key={a.id} className="who-card">
+                <b>{a.fullName}</b>
+                <span className="muted small">{a.organization || "—"}</span>
+                <span className="row small" style={{ gap: 4, flexWrap: "nowrap" }}>
+                  {event.days.map((d) => <span key={d.day} className={`an-day ${a.days.includes(d.day) ? "on" : ""}`} title={`Day ${d.day}: ${a.days.includes(d.day) ? "came" : "not checked in"}`}>{d.day}</span>)}
+                  {at && <span className="muted num" style={{ marginLeft: 6 }}>arrived {formatTime(at, event.timezone)}</span>}
+                </span>
+                {(a.phone || a.email) && <span className="muted small who-contact">{a.phone || a.email}</span>}
+              </div>
+            )
+          })}
+        </div>
+      ) : <p className="muted small">Nobody here.</p>}
+    </section>
   )
 }
 

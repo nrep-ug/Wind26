@@ -372,6 +372,11 @@ div.an-col:hover { background: none; }
 .an-day { width: 20px; height: 20px; border-radius: 6px; display: inline-grid; place-items: center; font-size: 0.7rem; background: #eef2f4; color: var(--ink-3); }
 .an-day.on { background: var(--ok-bg); color: var(--ok); font-weight: 600; }
 @media (max-width: 640px) { .an-hbar { grid-template-columns: 100px 1fr 56px; gap: 8px; } .an-filter { min-width: 0; width: 100%; } }
+.who-label { min-width: 96px; }
+.who-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; max-height: 520px; overflow-y: auto; padding: 2px; }
+.who-card { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); min-width: 0; }
+.who-card > b, .who-card > span { overflow-wrap: anywhere; }
+@media (max-width: 640px) { .who-grid { grid-template-columns: 1fr; max-height: none; } .who-label { min-width: 0; width: 100%; } }
 .an-row { cursor: pointer; }
 .an-row:hover td { background: var(--hover); }
 .an-detail td { background: #fafbfc; }
