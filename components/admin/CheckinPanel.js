@@ -44,7 +44,7 @@ export default function CheckinPanel({ event, attendees, reload, local }) {
     const form = e.currentTarget
     const data = Object.fromEntries(new FormData(form))
     const ok = await run(() => api(`${base}/scanners`, { method: "POST", body: data }),
-      codes ? `${data.name} is added. Give them their scanner code from the list.` : `${data.name} can now sign in and scan.`)
+      codes ? `${data.name} is added. Give them their ${data.role === "admin" ? "admin" : "scanner"} code from the list.` : `${data.name} can now sign in and scan.`)
     if (ok) { form.reset(); loadScanners() }
   }
 
@@ -89,10 +89,10 @@ export default function CheckinPanel({ event, attendees, reload, local }) {
       {!local && (
         <section className="card stack">
           <div>
-            <h2>Scanner helpers</h2>
+            <h2>{codes ? "Helpers and extra admins" : "Scanner helpers"}</h2>
             <p className="muted small">
               {codes
-                ? "Each helper signs in at the sign-in page with their own scanner code, in place of the admin password. It opens only the scanner for this event. Disable a helper to turn their code off."
+                ? "Each person signs in at the sign-in page with their own code, in place of the admin password. A scanner code opens only the scanner for this event; an admin code opens the full admin side. Disable someone to turn their code off at once."
                 : "They can only check people in for this event."}
             </p>
           </div>
@@ -103,6 +103,7 @@ export default function CheckinPanel({ event, attendees, reload, local }) {
                   {scanners.map((s) => (
                     <tr key={s.id}>
                       <td className="person"><b>{s.name}</b><span>{s.email || "No email"}</span></td>
+                      {codes && <td><span className={`pill ${s.role === "admin" ? "brand" : "neutral"}`}>{s.role === "admin" ? "Admin" : "Scanner"}</span></td>}
                       {s.code && (
                         <td>
                           <button type="button" className="ghost scanner-code" title="Copy code" disabled={s.status !== "active"} onClick={() => copy(s.code)}>
@@ -121,6 +122,14 @@ export default function CheckinPanel({ event, attendees, reload, local }) {
           <form className="row" onSubmit={addScanner} style={{ alignItems: "flex-end" }}>
             <label htmlFor="s-name" style={{ flex: "1 1 160px" }}>Name<input id="s-name" name="name" required /></label>
             <label htmlFor="s-email" style={{ flex: "2 1 220px" }}>{codes ? "Email (optional)" : "Email"}<input id="s-email" name="email" type="email" required={!codes} /></label>
+            {codes && (
+              <label htmlFor="s-role" style={{ flex: "0 1 170px" }}>Role
+                <select id="s-role" name="role" defaultValue="scanner">
+                  <option value="scanner">Scanner only</option>
+                  <option value="admin">Admin (full access)</option>
+                </select>
+              </label>
+            )}
             <button type="submit" disabled={busy}><Icon name="plus" />Add</button>
           </form>
         </section>

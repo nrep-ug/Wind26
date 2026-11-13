@@ -320,6 +320,22 @@ dialog::backdrop { background: rgba(10, 24, 30, 0.45); backdrop-filter: blur(2px
   * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
 
+/* Printing, or "Save as PDF", from the admin pages: only the page itself, in full, in colour. */
+.print-only { display: none; }
+@media print {
+  @page { size: A4; margin: 12mm; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { background: #fff; }
+  .shell { display: block; }
+  .sidebar, .no-print { display: none !important; }
+  .print-only { display: block; }
+  .main-inner { padding: 0; max-width: none; }
+  .card, .stat, .who-card, tr { break-inside: avoid; }
+  .table-wrap, .who-grid { max-height: none !important; overflow: visible !important; }
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .card { box-shadow: none; }
+}
+
 /* Analytics: every bar and number is a button that filters the people list. */
 .an-filter { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; font-weight: 500; color: var(--ink-2); width: 300px; max-width: 100%; }
 .an-kpi { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 2px; white-space: normal; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
@@ -370,7 +386,9 @@ div.an-col:hover { background: none; }
 .an-hbar-track i { display: block; height: 100%; background: var(--brand); border-radius: 0 4px 4px 0; }
 .an-hbar-num { font-size: 0.78rem; color: var(--ink-2); text-align: right; }
 .an-day { width: 20px; height: 20px; border-radius: 6px; display: inline-grid; place-items: center; font-size: 0.7rem; background: #eef2f4; color: var(--ink-3); }
-.an-day.on { background: var(--ok-bg); color: var(--ok); font-weight: 600; }
+/* Came: solid green with white text. Didn't come: an empty outlined box. */
+.an-day { border: 1px dashed var(--line-strong); background: var(--surface); color: var(--ink-3); }
+.an-day.on { background: var(--ok); border: 1px solid var(--ok); color: #fff; font-weight: 600; }
 @media (max-width: 640px) { .an-hbar { grid-template-columns: 100px 1fr 56px; gap: 8px; } .an-filter { min-width: 0; width: 100%; } }
 .who-label { min-width: 96px; }
 .who-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; max-height: 520px; overflow-y: auto; padding: 2px; }

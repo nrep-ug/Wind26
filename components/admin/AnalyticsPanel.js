@@ -103,6 +103,16 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
     return scores.length ? `${Math.round(scores.reduce((t, x) => t + x, 0) / scores.length)}%` : "—"
   }
 
+  // The browser's print dialog saves the page as it is now, filters and all, as a PDF.
+  // The file name follows the page title, so it says what was selected.
+  function printPdf() {
+    const title = document.title
+    const parts = [orgLabel, genderLabel, segment?.label].filter(Boolean).map((s) => s.replace(/[^\w\s-]/g, "").trim())
+    document.title = [`${event.code} analytics`, ...parts].join(" - ")
+    window.addEventListener("afterprint", () => { document.title = title }, { once: true })
+    window.print()
+  }
+
   function downloadCsv() {
     const esc = (v) => (/[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v))
     const head = ["Name", "Organisation", "Gender", "Email", "Phone", "Days attended", "Badge emailed", ...answeredQuizzes.map((q) => `${q.title} (%)`), "Average (%)"]
@@ -121,9 +131,13 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
       <div className="page-head">
         <div>
           <h1>Analytics</h1>
-          <p>Click any bar or number to see who is behind it.</p>
+          <p className="no-print">Click any bar or number to see who is behind it.</p>
+          <p className="print-only" suppressHydrationWarning>
+            {event.name} · {[orgLabel, genderLabel, segment?.label].filter(Boolean).join(" · ") || "Everyone"} · printed {new Date().toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: event.timezone })}
+          </p>
         </div>
-        <div className="row">
+        <div className="row no-print">
+          <button type="button" className="secondary" style={{ alignSelf: "flex-end" }} onClick={printPdf}><Icon name="download" />Download PDF</button>
         <label className="an-filter" htmlFor="an-gender">Gender
           <select id="an-gender" value={gender} onChange={(e) => { setGender(e.target.value); setSegment(null) }}>
             <option value="">Everyone ({inOrg.length})</option>
