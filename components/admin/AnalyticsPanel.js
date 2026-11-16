@@ -280,7 +280,10 @@ export default function AnalyticsPanel({ event, attendees, quizzes }) {
             {genderLabel && <button type="button" className="an-chip on" onClick={() => setGender("")}>{genderLabel}<Icon name="x" size={14} /></button>}
             {segment && <button type="button" className="an-chip on" onClick={() => setSegment(null)}>{segment.label}<Icon name="x" size={14} /></button>}
           </div>
-          <button type="button" className="secondary" onClick={downloadCsv} disabled={!people.length}><Icon name="download" />CSV of this list</button>
+          <div className="row no-print">
+            <button type="button" className="secondary" onClick={printPdf}><Icon name="download" />PDF of this page</button>
+            <button type="button" className="secondary" onClick={downloadCsv} disabled={!people.length}><Icon name="download" />CSV of this list</button>
+          </div>
         </div>
         <div className="table-wrap" style={{ maxHeight: 480, overflowY: "auto" }}>
           <table>

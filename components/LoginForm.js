@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { api } from "@/components/api"
+import Icon from "@/components/admin/Icon"
 
 // mode "password": one shared admin password. mode "signin": an emailed 6-digit code.
 export default function LoginForm({ mode = "signin" }) {
@@ -9,6 +10,7 @@ export default function LoginForm({ mode = "signin" }) {
   const [email, setEmail] = useState("")
   const [code, setCode] = useState("")
   const [password, setPassword] = useState("")
+  const [show, setShow] = useState(false)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -42,7 +44,15 @@ export default function LoginForm({ mode = "signin" }) {
         {step === "password" && (
           <label htmlFor="password">
             Admin password or scanner code
-            <input id="password" type="password" autoComplete="current-password" required autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+            <span className="password-field">
+              {/* Phones must not capitalise or "correct" a password or code while it is visible. */}
+              <input id="password" type={show ? "text" : "password"} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                required autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+              <button type="button" className="ghost icon-btn" aria-label={show ? "Hide password" : "Show password"} aria-pressed={show}
+                title={show ? "Hide password" : "Show password"} onClick={() => setShow((v) => !v)}>
+                <Icon name={show ? "eye-off" : "eye"} />
+              </button>
+            </span>
             <span className="muted small">Scanner helpers: enter the code the organiser gave you, e.g. K7QM-4RXP-2WTN.</span>
           </label>
         )}
