@@ -330,7 +330,8 @@ dialog::backdrop { background: rgba(10, 24, 30, 0.45); backdrop-filter: blur(2px
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body { background: #fff; }
   .shell { display: block; }
-  .sidebar, .no-print { display: none !important; }
+  /* PDFs get passed around: no phone numbers or emails in them. */
+  .sidebar, .no-print, .who-contact { display: none !important; }
   .print-only { display: block; }
   .main-inner { padding: 0; max-width: none; }
   .card, .stat, .who-card, tr { break-inside: avoid; }
